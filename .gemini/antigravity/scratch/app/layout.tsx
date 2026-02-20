@@ -3,6 +3,9 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
+import ScrollProgress from "@/components/layout/ScrollProgress";
+import BackToTop from "@/components/layout/BackToTop";
+import PageTracker from "@/components/layout/PageTracker";
 import "./globals.css";
 
 const inter = Inter({
@@ -48,9 +51,12 @@ export default function RootLayout({
                     enableSystem
                     disableTransitionOnChange
                 >
+                    <ScrollProgress />
+                    <PageTracker />
                     <Header />
                     <main>{children}</main>
                     <Footer />
+                    <BackToTop />
                 </ThemeProvider>
             </body>
         </html>

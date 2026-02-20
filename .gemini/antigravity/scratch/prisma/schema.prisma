@@ -1,0 +1,127 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model User {
+  id        String     @id @default(cuid())
+  username  String     @unique
+  password  String
+  role      String     @default("ADMIN") // ADMIN | VIEWER
+  createdAt DateTime   @default(now())
+  auditLogs AuditLog[]
+}
+
+model Project {
+  id              String   @id @default(cuid())
+  title           String
+  description     String
+  tags            String   // JSON string array
+  link            String?
+  github          String?
+  image           String?
+  order           Int      @default(0)
+  metaTitle       String?
+  metaDescription String?
+  metaKeywords    String?
+  metadata        String?  // JSON: { difficulty: 1-5, impact: string, techDepth: 1-5 }
+  locale          String   @default("ko")
+  localeGroup     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Skill {
+  id          String   @id @default(cuid())
+  name        String
+  category    String
+  level       Int
+  icon        String
+  order       Int      @default(0)
+  locale      String   @default("ko")
+  localeGroup String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model HeroContent {
+  id           String  @id @default("hero")
+  badge        String  @default("Open to opportunities")
+  titleLine1   String  @default("안녕하세요,")
+  titleLine2   String  @default("개발자")
+  titleSuffix  String  @default("입니다.")
+  subtitle     String  @default("사용자 경험을 최우선으로 생각하는 프론트엔드 개발자입니다.\n깔끔한 코드와 아름다운 인터페이스를 만들어 갑니다.")
+  ctaPrimary   String  @default("프로젝트 보기")
+  ctaSecondary String  @default("연락하기")
+  profileImage String?
+  locale       String  @default("ko")
+}
+
+model SiteSettings {
+  id              String @id @default("settings")
+  siteName        String @default("Portfolio")
+  siteDescription String @default("프론트엔드 개발자 포트폴리오 - React, Next.js, TypeScript 전문")
+  footerTagline   String @default("Minimalist Tech Professional")
+  githubUrl       String @default("https://github.com")
+  linkedinUrl     String @default("https://linkedin.com")
+  email           String @default("hello@example.com")
+}
+
+model ContactMessage {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+// Phase 1: Visitor tracking for analytics dashboard
+model PageView {
+  id        String   @id @default(cuid())
+  path      String
+  referrer  String?
+  userAgent String?
+  ip        String?
+  createdAt DateTime @default(now())
+}
+
+// Phase 1: Audit log for all CRUD operations
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String   // CREATE | UPDATE | DELETE
+  entity    String   // Project | Skill | HeroContent | etc.
+  entityId  String
+  prevData  String?  // JSON
+  newData   String?  // JSON
+  createdAt DateTime @default(now())
+}
+
+// Phase 1: Security log for rate limiting failures
+model SecurityLog {
+  id        String   @id @default(cuid())
+  ip        String
+  endpoint  String
+  method    String
+  status    Int
+  message   String?
+  createdAt DateTime @default(now())
+}
+
+// Phase 3: Webhook configuration
+model WebhookConfig {
+  id        String @id @default("webhooks")
+  slackUrl  String @default("")
+  emailTo   String @default("")
+  emailHost String @default("")
+  emailPort Int    @default(587)
+  emailUser String @default("")
+  emailPass String @default("")
+  enabled   Boolean @default(false)
+}

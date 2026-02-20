@@ -30,6 +30,9 @@ const config: Config = {
                 "fade-in": "fadeIn 0.8s ease-out forwards",
                 "slide-up": "slideUp 0.6s ease-out forwards",
                 "gradient-x": "gradientX 3s ease infinite",
+                float: "float 4s ease-in-out infinite",
+                shimmer: "shimmer 3s ease-in-out infinite",
+                "glow-pulse": "glowPulse 3s ease-in-out infinite",
             },
             keyframes: {
                 fadeIn: {
@@ -43,6 +46,18 @@ const config: Config = {
                 gradientX: {
                     "0%, 100%": { backgroundPosition: "0% 50%" },
                     "50%": { backgroundPosition: "100% 50%" },
+                },
+                float: {
+                    "0%, 100%": { transform: "translateY(0)" },
+                    "50%": { transform: "translateY(-8px)" },
+                },
+                shimmer: {
+                    "0%": { backgroundPosition: "-200% 0" },
+                    "100%": { backgroundPosition: "200% 0" },
+                },
+                glowPulse: {
+                    "0%, 100%": { boxShadow: "0 0 20px rgba(59,130,246,0.1)" },
+                    "50%": { boxShadow: "0 0 40px rgba(59,130,246,0.2)" },
                 },
             },
         },
