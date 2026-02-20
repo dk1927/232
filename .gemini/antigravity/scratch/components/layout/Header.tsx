@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { Moon, Sun, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -13,6 +14,7 @@ const navLinks = [
 ];
 
 export default function Header() {
+    const pathname = usePathname();
     const { theme, setTheme } = useTheme();
     const [mounted, setMounted] = useState(false);
     const [scrolled, setScrolled] = useState(false);
@@ -42,6 +44,9 @@ export default function Header() {
         sections.forEach((s) => s && observer.observe(s));
         return () => observer.disconnect();
     }, []);
+
+    // Don't render public header on admin routes
+    if (pathname?.startsWith("/admin")) return null;
 
     const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark");
 

@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/db";
+import { getSiteSettings } from "@/lib/settings";
 import { Github, Mail, Linkedin, ArrowUp } from "lucide-react";
 
 const navLinks = [
@@ -9,15 +9,7 @@ const navLinks = [
 ];
 
 export default async function Footer() {
-    const settings = await prisma.siteSettings.findUnique({ where: { id: "settings" } });
-
-    const s = settings || {
-        siteName: "Portfolio",
-        footerTagline: "Minimalist Tech Professional",
-        githubUrl: "https://github.com",
-        linkedinUrl: "https://linkedin.com",
-        email: "hello@example.com",
-    };
+    const s = await getSiteSettings();
 
     return (
         <footer className="relative border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-bg-dark overflow-hidden">

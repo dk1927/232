@@ -24,6 +24,8 @@ export async function PUT(request: Request) {
             githubUrl: body.githubUrl,
             linkedinUrl: body.linkedinUrl,
             email: body.email,
+            maintenanceMode: body.maintenanceMode,
+            maintenanceMessage: body.maintenanceMessage,
         },
         create: {
             id: "settings",
@@ -33,6 +35,8 @@ export async function PUT(request: Request) {
             githubUrl: body.githubUrl,
             linkedinUrl: body.linkedinUrl,
             email: body.email,
+            maintenanceMode: body.maintenanceMode,
+            maintenanceMessage: body.maintenanceMessage,
         },
     });
     return NextResponse.json(settings);

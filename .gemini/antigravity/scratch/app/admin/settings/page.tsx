@@ -7,7 +7,7 @@ import { Save, Lock, Sparkles, Globe, Eye, EyeOff } from "lucide-react";
 
 export default function AdminSettingsPage() {
     const { toast } = useToast();
-    const [tab, setTab] = useState<"hero" | "site" | "password">("hero");
+    const [tab, setTab] = useState<"hero" | "site" | "password" | "system">("hero");
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
@@ -21,11 +21,21 @@ export default function AdminSettingsPage() {
     const [site, setSite] = useState({
         siteName: "", siteDescription: "", footerTagline: "",
         githubUrl: "", linkedinUrl: "", email: "",
+        maintenanceMode: false, maintenanceMessage: "",
     });
 
     // Password form
     const [pw, setPw] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
     const [showPw, setShowPw] = useState(false);
+
+    // ... (rest of imports and setup)
+
+
+
+    // ...
+
+
+
 
     const fetchData = useCallback(async () => {
         try {
@@ -122,6 +132,7 @@ export default function AdminSettingsPage() {
     const tabs = [
         { key: "hero" as const, label: "히어로 섹션", icon: Sparkles },
         { key: "site" as const, label: "사이트 설정", icon: Globe },
+        { key: "system" as const, label: "시스템 점검", icon: Lock },
         { key: "password" as const, label: "비밀번호 변경", icon: Lock },
     ];
 
@@ -226,6 +237,48 @@ export default function AdminSettingsPage() {
                     </div>
                     <button onClick={saveSite} disabled={saving} className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-accent text-white text-sm font-medium hover:bg-blue-600 transition-colors disabled:opacity-50">
                         <Save size={16} /> {saving ? "저장 중..." : "저장"}
+                    </button>
+                </div>
+            )}
+
+            {/* System/Maintenance Tab */}
+            {tab === "system" && (
+                <div className="mt-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 border-l-4 border-l-red-500">
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                        <div className={`w-3 h-3 rounded-full ${site.maintenanceMode ? "bg-red-500 animate-pulse" : "bg-green-500"}`} />
+                        {site.maintenanceMode ? "시스템 점검 모드 활성화됨" : "정상 운영 중"}
+                    </h3>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 mb-6">
+                        점검 모드를 켜면 관리자를 제외한 모든 사용자의 접근이 차단되고 점검 페이지가 표시됩니다. (Kill Switch)
+                    </p>
+
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-800">
+                            <button
+                                onClick={() => setSite({ ...site, maintenanceMode: !site.maintenanceMode })}
+                                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 ${site.maintenanceMode ? "bg-red-500" : "bg-slate-200 dark:bg-slate-700"}`}
+                            >
+                                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${site.maintenanceMode ? "translate-x-6" : "translate-x-1"}`} />
+                            </button>
+                            <label className="text-sm font-medium text-slate-900 dark:text-white cursor-pointer" onClick={() => setSite({ ...site, maintenanceMode: !site.maintenanceMode })}>
+                                긴급 점검 모드 (Kill Switch)
+                            </label>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">점검 안내 메시지</label>
+                            <textarea
+                                rows={3}
+                                value={site.maintenanceMessage || ""}
+                                onChange={(e) => setSite({ ...site, maintenanceMessage: e.target.value })}
+                                className={inputClass + " resize-none"}
+                                placeholder="현재 시스템 점검 중입니다..."
+                            />
+                        </div>
+                    </div>
+
+                    <button onClick={saveSite} disabled={saving} className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition-colors disabled:opacity-50">
+                        <Save size={16} /> 설정 저장
                     </button>
                 </div>
             )}

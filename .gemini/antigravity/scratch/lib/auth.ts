@@ -1,10 +1,12 @@
 import { getServerSession } from "next-auth";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
 
 export async function requireAuth() {
     const session = await getServerSession();
     if (!session) {
+        logger.warn("Unauthorized access attempt", { path: "requireAuth" });
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     return null;
@@ -13,6 +15,7 @@ export async function requireAuth() {
 export async function requireAdmin() {
     const session = await getServerSession();
     if (!session) {
+        logger.warn("Unauthorized admin access attempt - No Session", { path: "requireAdmin" });
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -21,6 +24,10 @@ export async function requireAdmin() {
     });
 
     if (!user || user.role !== "ADMIN") {
+        logger.warn("Forbidden admin access attempt", {
+            user: session.user?.name,
+            role: user?.role || "unknown"
+        });
         return NextResponse.json({ error: "Admin access required" }, { status: 403 });
     }
 

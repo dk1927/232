@@ -7,6 +7,7 @@ import { signOut, useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { ToastProvider } from "@/components/admin/Toast";
 import AuthProvider from "@/components/admin/AuthProvider";
+import { AdminProvider } from "@/components/admin/AdminContext";
 import {
     LayoutDashboard,
     FolderKanban,
@@ -24,22 +25,25 @@ import {
 } from "lucide-react";
 
 const navItems = [
-    { label: "대시보드", href: "/admin", icon: LayoutDashboard },
-    { label: "프로젝트", href: "/admin/projects", icon: FolderKanban },
-    { label: "스킬", href: "/admin/skills", icon: Cpu },
-    { label: "메시지", href: "/admin/messages", icon: Mail },
-    { label: "사용자", href: "/admin/users", icon: Users },
-    { label: "감사 로그", href: "/admin/audit", icon: FileText },
-    { label: "웹훅", href: "/admin/webhooks", icon: Webhook },
-    { label: "설정", href: "/admin/settings", icon: Settings },
+    { label: "대시보드", href: "/admin", icon: LayoutDashboard, adminOnly: false },
+    { label: "프로젝트", href: "/admin/projects", icon: FolderKanban, adminOnly: false },
+    { label: "스킬", href: "/admin/skills", icon: Cpu, adminOnly: false },
+    { label: "메시지", href: "/admin/messages", icon: Mail, adminOnly: false },
+    { label: "사용자", href: "/admin/users", icon: Users, adminOnly: true },
+    { label: "감사 로그", href: "/admin/audit", icon: FileText, adminOnly: true },
+    { label: "웹훅", href: "/admin/webhooks", icon: Webhook, adminOnly: true },
+    { label: "설정", href: "/admin/settings", icon: Settings, adminOnly: true },
 ];
 
 function AdminSidebar() {
     const pathname = usePathname();
     const { data: session } = useSession();
     const [mobileOpen, setMobileOpen] = useState(false);
+    const userRole = (session?.user as unknown as { role?: string })?.role || "VIEWER";
+    const isAdmin = userRole === "ADMIN";
+    const visibleNavItems = isAdmin ? navItems : navItems.filter(item => !item.adminOnly);
 
-    const currentPage = navItems.find(
+    const currentPage = visibleNavItems.find(
         (item) =>
             pathname === item.href ||
             (item.href !== "/admin" && pathname.startsWith(item.href))
@@ -95,7 +99,7 @@ function AdminSidebar() {
                 </div>
 
                 <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-                    {navItems.map((item) => {
+                    {visibleNavItems.map((item) => {
                         const Icon = item.icon;
                         const isActive =
                             pathname === item.href ||
@@ -128,6 +132,12 @@ function AdminSidebar() {
                             <span className="flex items-center gap-1.5">
                                 <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
                                 {session.user.name}
+                                <span className={cn(
+                                    "ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold",
+                                    isAdmin ? "bg-accent/10 text-accent" : "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400"
+                                )}>
+                                    {userRole}
+                                </span>
                             </span>
                         </div>
                     )}
@@ -152,6 +162,24 @@ function AdminSidebar() {
     );
 }
 
+function AdminLayoutInner({ children }: { children: React.ReactNode }) {
+    const { data: session } = useSession();
+    const userRole = (session?.user as unknown as { role?: string })?.role || "VIEWER";
+
+    return (
+        <AdminProvider role={userRole}>
+            <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+                <AdminSidebar />
+                <main className="lg:ml-64 min-h-screen">
+                    <div className="pt-14 lg:pt-0 p-6 lg:p-8">
+                        {children}
+                    </div>
+                </main>
+            </div>
+        </AdminProvider>
+    );
+}
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
 
@@ -166,14 +194,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return (
         <AuthProvider>
             <ToastProvider>
-                <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-                    <AdminSidebar />
-                    <main className="lg:ml-64 min-h-screen">
-                        <div className="pt-14 lg:pt-0 p-6 lg:p-8">
-                            {children}
-                        </div>
-                    </main>
-                </div>
+                <AdminLayoutInner>{children}</AdminLayoutInner>
             </ToastProvider>
         </AuthProvider>
     );

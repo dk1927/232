@@ -12,6 +12,7 @@ export async function PUT(
 
     const prev = await prisma.project.findUnique({ where: { id: params.id } });
     const body = await request.json();
+    const metadata = body.metadata ? JSON.stringify(body.metadata) : null;
 
     const project = await prisma.project.update({
         where: { id: params.id },
@@ -23,6 +24,7 @@ export async function PUT(
             github: body.github || null,
             image: body.image || null,
             order: body.order ?? 0,
+            metadata,
             metaTitle: body.metaTitle || null,
             metaDescription: body.metaDescription || null,
             metaKeywords: body.metaKeywords || null,

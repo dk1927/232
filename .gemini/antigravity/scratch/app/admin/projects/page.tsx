@@ -2,8 +2,15 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/components/admin/Toast";
+import { useAdminRole } from "@/components/admin/AdminContext";
 import ImageUpload from "@/components/admin/ImageUpload";
-import { Plus, Pencil, Trash2, X, Save, GripVertical, ExternalLink, Github, FolderKanban, ChevronDown } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Save, GripVertical, ExternalLink, Github, FolderKanban, ChevronDown, Star, Shield, TrendingUp } from "lucide-react";
+
+interface ProjectMetadata {
+    difficulty?: number;
+    impact?: string;
+    type?: string;
+}
 
 interface Project {
     id: string;
@@ -13,11 +20,14 @@ interface Project {
     link: string | null;
     github: string | null;
     image: string | null;
+    metadata: string | null;
     metaTitle: string | null;
     metaDescription: string | null;
     metaKeywords: string | null;
     order: number;
 }
+
+const projectTypes = ["Strategic", "ERP", "Infrastructure", "Development", "Operations"];
 
 const emptyProject = {
     title: "",
@@ -30,10 +40,14 @@ const emptyProject = {
     metaDescription: "",
     metaKeywords: "",
     order: 0,
+    difficulty: 3,
+    impact: "",
+    type: "Strategic",
 };
 
 export default function AdminProjectsPage() {
     const { toast } = useToast();
+    const { isAdmin } = useAdminRole();
     const [projects, setProjects] = useState<Project[]>([]);
     const [editing, setEditing] = useState<string | null>(null);
     const [creating, setCreating] = useState(false);
@@ -58,6 +72,15 @@ export default function AdminProjectsPage() {
         fetchProjects();
     }, [fetchProjects]);
 
+    const parseMetadata = (metadataStr: string | null): ProjectMetadata => {
+        if (!metadataStr) return {};
+        try {
+            return JSON.parse(metadataStr);
+        } catch {
+            return {};
+        }
+    };
+
     const handleSave = async () => {
         if (!form.title.trim() || !form.description.trim()) {
             toast("제목과 설명을 입력해주세요.", "error");
@@ -65,9 +88,23 @@ export default function AdminProjectsPage() {
         }
         setSaving(true);
         try {
+            const metadata: ProjectMetadata = {};
+            if (form.difficulty) metadata.difficulty = form.difficulty;
+            if (form.impact.trim()) metadata.impact = form.impact.trim();
+            if (form.type) metadata.type = form.type;
+
             const body = {
-                ...form,
+                title: form.title,
+                description: form.description,
                 tags: form.tags.split(",").map((t: string) => t.trim()).filter(Boolean),
+                link: form.link,
+                github: form.github,
+                image: form.image,
+                order: form.order,
+                metadata: Object.keys(metadata).length > 0 ? metadata : null,
+                metaTitle: form.metaTitle,
+                metaDescription: form.metaDescription,
+                metaKeywords: form.metaKeywords,
             };
             const url = editing ? `/api/admin/projects/${editing}` : "/api/admin/projects";
             const method = editing ? "PUT" : "POST";
@@ -92,6 +129,7 @@ export default function AdminProjectsPage() {
     const handleEdit = (project: Project) => {
         setCreating(false);
         setEditing(project.id);
+        const meta = parseMetadata(project.metadata);
         setForm({
             title: project.title,
             description: project.description,
@@ -103,6 +141,9 @@ export default function AdminProjectsPage() {
             metaDescription: project.metaDescription || "",
             metaKeywords: project.metaKeywords || "",
             order: project.order,
+            difficulty: meta.difficulty || 3,
+            impact: meta.impact || "",
+            type: meta.type || "Strategic",
         });
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
@@ -140,6 +181,17 @@ export default function AdminProjectsPage() {
 
     const inputClass = "w-full px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all";
 
+    const typeColor = (type: string) => {
+        switch (type) {
+            case "Strategic": return "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20";
+            case "ERP": return "bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20";
+            case "Infrastructure": return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20";
+            case "Development": return "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20";
+            case "Operations": return "bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20";
+            default: return "bg-slate-500/10 text-slate-500 border-slate-500/20";
+        }
+    };
+
     return (
         <div>
             <div className="flex items-center justify-between">
@@ -149,13 +201,15 @@ export default function AdminProjectsPage() {
                         총 {projects.length}개 프로젝트
                     </p>
                 </div>
-                <button
-                    onClick={() => { setEditing(null); setCreating(true); setForm(emptyProject); }}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-accent text-white text-sm font-medium hover:bg-blue-600 transition-colors shadow-sm"
-                >
-                    <Plus size={16} />
-                    새 프로젝트
-                </button>
+                {isAdmin && (
+                    <button
+                        onClick={() => { setEditing(null); setCreating(true); setForm(emptyProject); }}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-accent text-white text-sm font-medium hover:bg-blue-600 transition-colors shadow-sm"
+                    >
+                        <Plus size={16} />
+                        새 프로젝트
+                    </button>
+                )}
             </div>
 
             {/* Create / Edit Form */}
@@ -178,6 +232,47 @@ export default function AdminProjectsPage() {
                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">설명 *</label>
                             <textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="프로젝트에 대한 설명..." className={inputClass + " resize-none"} />
                         </div>
+
+                        {/* Strategic Metadata Section */}
+                        <div className="md:col-span-2 bg-slate-50 dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+                            <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
+                                <Shield size={16} className="text-accent" />
+                                전략 메타데이터
+                            </h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">프로젝트 유형</label>
+                                    <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} className={inputClass}>
+                                        {projectTypes.map((t) => <option key={t} value={t}>{t}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">
+                                        난이도: <span className="text-accent font-bold">{form.difficulty}/5</span>
+                                    </label>
+                                    <div className="flex items-center gap-1 mt-1">
+                                        {[1, 2, 3, 4, 5].map((n) => (
+                                            <button
+                                                key={n}
+                                                type="button"
+                                                onClick={() => setForm({ ...form, difficulty: n })}
+                                                className="p-1 transition-colors"
+                                            >
+                                                <Star
+                                                    size={20}
+                                                    className={n <= form.difficulty ? "text-amber-400 fill-amber-400" : "text-slate-300 dark:text-slate-600"}
+                                                />
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">임팩트 범위</label>
+                                    <input value={form.impact} onChange={(e) => setForm({ ...form, impact: e.target.value })} placeholder="전사 R&D, 생산팀..." className={inputClass} />
+                                </div>
+                            </div>
+                        </div>
+
                         <div>
                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">라이브 링크</label>
                             <input value={form.link} onChange={(e) => setForm({ ...form, link: e.target.value })} placeholder="https://..." className={inputClass} />
@@ -236,55 +331,85 @@ export default function AdminProjectsPage() {
 
             {/* Project List */}
             <div className="mt-6 space-y-3">
-                {projects.map((project, index) => (
-                    <div
-                        key={project.id}
-                        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 hover:border-slate-300 dark:hover:border-slate-700 transition-all"
-                    >
-                        <div className="flex items-start gap-4">
-                            <div className="flex items-center gap-2 text-slate-300 dark:text-slate-600 mt-1 shrink-0">
-                                <GripVertical size={16} />
-                                <span className="text-xs font-mono">#{index + 1}</span>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-start justify-between gap-4">
-                                    <h3 className="font-semibold text-slate-900 dark:text-white">{project.title}</h3>
-                                    <div className="flex items-center gap-1 shrink-0">
-                                        {project.link && (
-                                            <a href={project.link} target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg text-slate-400 hover:text-accent hover:bg-accent/10 transition-colors">
-                                                <ExternalLink size={14} />
-                                            </a>
-                                        )}
-                                        {project.github && (
-                                            <a href={project.github} target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg text-slate-400 hover:text-accent hover:bg-accent/10 transition-colors">
-                                                <Github size={14} />
-                                            </a>
-                                        )}
-                                        <button onClick={() => handleEdit(project)} className="p-2 rounded-lg text-slate-400 hover:text-accent hover:bg-accent/10 transition-colors">
-                                            <Pencil size={14} />
-                                        </button>
-                                        <button onClick={() => handleDelete(project.id)} className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors">
-                                            <Trash2 size={14} />
-                                        </button>
-                                    </div>
+                {projects.map((project, index) => {
+                    const meta = parseMetadata(project.metadata);
+                    return (
+                        <div
+                            key={project.id}
+                            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 hover:border-slate-300 dark:hover:border-slate-700 transition-all"
+                        >
+                            <div className="flex items-start gap-4">
+                                <div className="flex items-center gap-2 text-slate-300 dark:text-slate-600 mt-1 shrink-0">
+                                    <GripVertical size={16} />
+                                    <span className="text-xs font-mono">#{index + 1}</span>
                                 </div>
-                                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 line-clamp-2">{project.description}</p>
-                                <div className="mt-2.5 flex flex-wrap gap-1.5">
-                                    {JSON.parse(project.tags).map((tag: string) => (
-                                        <span key={tag} className="px-2 py-0.5 text-xs font-mono text-accent bg-accent/10 rounded">{tag}</span>
-                                    ))}
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <h3 className="font-semibold text-slate-900 dark:text-white">{project.title}</h3>
+                                            {meta.type && (
+                                                <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border ${typeColor(meta.type)}`}>
+                                                    {meta.type}
+                                                </span>
+                                            )}
+                                            {meta.difficulty && meta.difficulty >= 4 && (
+                                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-500/10 rounded-full border border-amber-500/20">
+                                                    <Star size={10} fill="currentColor" /> {meta.difficulty}/5
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-1 shrink-0">
+                                            {project.link && (
+                                                <a href={project.link} target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg text-slate-400 hover:text-accent hover:bg-accent/10 transition-colors">
+                                                    <ExternalLink size={14} />
+                                                </a>
+                                            )}
+                                            {project.github && (
+                                                <a href={project.github} target="_blank" rel="noopener noreferrer" className="p-2 rounded-lg text-slate-400 hover:text-accent hover:bg-accent/10 transition-colors">
+                                                    <Github size={14} />
+                                                </a>
+                                            )}
+                                            {isAdmin && (
+                                                <>
+                                                    <button onClick={() => handleEdit(project)} className="p-2 rounded-lg text-slate-400 hover:text-accent hover:bg-accent/10 transition-colors">
+                                                        <Pencil size={14} />
+                                                    </button>
+                                                    <button onClick={() => handleDelete(project.id)} className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors">
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400 line-clamp-2">{project.description}</p>
+
+                                    {/* Metadata Row */}
+                                    {meta.impact && (
+                                        <div className="mt-2 flex items-center gap-2 text-xs text-slate-500">
+                                            <TrendingUp size={12} className="text-emerald-500" />
+                                            <span>임팩트: <span className="font-medium text-slate-700 dark:text-slate-300">{meta.impact}</span></span>
+                                        </div>
+                                    )}
+
+                                    <div className="mt-2.5 flex flex-wrap gap-1.5">
+                                        {JSON.parse(project.tags).map((tag: string) => (
+                                            <span key={tag} className="px-2 py-0.5 text-xs font-mono text-accent bg-accent/10 rounded">{tag}</span>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
                 {projects.length === 0 && (
                     <div className="text-center py-16 bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 rounded-xl">
                         <FolderKanban size={40} className="mx-auto text-slate-300 dark:text-slate-600" />
                         <p className="mt-3 text-sm text-slate-400">등록된 프로젝트가 없습니다.</p>
-                        <button onClick={() => { setCreating(true); setForm(emptyProject); }} className="mt-3 text-sm text-accent hover:underline">
-                            첫 프로젝트 추가하기
-                        </button>
+                        {isAdmin && (
+                            <button onClick={() => { setCreating(true); setForm(emptyProject); }} className="mt-3 text-sm text-accent hover:underline">
+                                첫 프로젝트 추가하기
+                            </button>
+                        )}
                     </div>
                 )}
             </div>

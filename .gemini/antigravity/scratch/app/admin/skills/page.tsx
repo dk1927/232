@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useToast } from "@/components/admin/Toast";
-import { Plus, Pencil, Trash2, X, Save, Cpu } from "lucide-react";
+import { useAdminRole } from "@/components/admin/AdminContext";
+import { Plus, Pencil, Trash2, X, Save, Cpu, Search } from "lucide-react";
 
 interface Skill {
     id: string;
@@ -13,38 +14,73 @@ interface Skill {
     order: number;
 }
 
-const categories = ["Frontend", "Backend", "Tools", "Other"];
-const emptySkill = { name: "", category: "Frontend", level: 80, icon: "", order: 0 };
+const emptySkill = { name: "", category: "", level: 80, icon: "", order: 0 };
 
 export default function AdminSkillsPage() {
     const { toast } = useToast();
+    const { isAdmin } = useAdminRole();
     const [skills, setSkills] = useState<Skill[]>([]);
     const [editing, setEditing] = useState<string | null>(null);
     const [creating, setCreating] = useState(false);
     const [form, setForm] = useState(emptySkill);
+    const [customCategory, setCustomCategory] = useState("");
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [filterCategory, setFilterCategory] = useState("ALL");
+
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const [allCategories, setAllCategories] = useState<string[]>([]);
+    const [debouncedSearch, setDebouncedSearch] = useState("");
+
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedSearch(searchQuery), 500);
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
+
+    // Derived for display grouping only
+    const displayCategories = useMemo(() => {
+        const cats = Array.from(new Set(skills.map((s) => s.category))).sort();
+        return cats;
+    }, [skills]);
 
     const fetchSkills = useCallback(async () => {
         try {
-            const res = await fetch("/api/admin/skills");
+            const query = new URLSearchParams({
+                page: page.toString(),
+                limit: "20",
+                search: debouncedSearch,
+                category: filterCategory,
+            });
+            const res = await fetch(`/api/admin/skills?${query}`);
             if (!res.ok) throw new Error("Failed to fetch");
-            const data = await res.json();
+            const { data, meta } = await res.json();
             setSkills(data);
+            setTotalPages(meta.totalPages);
+            setAllCategories(meta.allCategories || []);
         } catch {
             toast("스킬을 불러오는데 실패했습니다.", "error");
         } finally {
             setLoading(false);
         }
-    }, [toast]);
+    }, [toast, page, filterCategory, debouncedSearch]);
 
     useEffect(() => {
         fetchSkills();
     }, [fetchSkills]);
 
+    // Server-side filtered
+    const filteredSkills = skills;
+
     const handleSave = async () => {
+        const finalCategory = customCategory.trim() || form.category;
         if (!form.name.trim() || !form.icon.trim()) {
             toast("이름과 아이콘을 입력해주세요.", "error");
+            return;
+        }
+        if (!finalCategory) {
+            toast("카테고리를 선택하거나 입력해주세요.", "error");
             return;
         }
         setSaving(true);
@@ -54,13 +90,14 @@ export default function AdminSkillsPage() {
             const res = await fetch(url, {
                 method,
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(form),
+                body: JSON.stringify({ ...form, category: finalCategory }),
             });
             if (!res.ok) throw new Error("Failed to save");
             toast(editing ? "스킬이 수정되었습니다." : "스킬이 추가되었습니다.");
             setEditing(null);
             setCreating(false);
             setForm(emptySkill);
+            setCustomCategory("");
             fetchSkills();
         } catch {
             toast("저장에 실패했습니다.", "error");
@@ -73,6 +110,7 @@ export default function AdminSkillsPage() {
         setCreating(false);
         setEditing(skill.id);
         setForm({ name: skill.name, category: skill.category, level: skill.level, icon: skill.icon, order: skill.order });
+        setCustomCategory("");
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
@@ -88,7 +126,7 @@ export default function AdminSkillsPage() {
         }
     };
 
-    const handleCancel = () => { setEditing(null); setCreating(false); setForm(emptySkill); };
+    const handleCancel = () => { setEditing(null); setCreating(false); setForm(emptySkill); setCustomCategory(""); };
 
     if (loading) {
         return (
@@ -102,8 +140,8 @@ export default function AdminSkillsPage() {
         );
     }
 
-    const groupedSkills = categories
-        .map((cat) => ({ category: cat, items: skills.filter((s) => s.category === cat) }))
+    const groupedSkills = displayCategories
+        .map((cat) => ({ category: cat, items: filteredSkills.filter((s) => s.category === cat) }))
         .filter((g) => g.items.length > 0);
 
     const levelColor = (level: number) => {
@@ -120,12 +158,54 @@ export default function AdminSkillsPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-slate-900 dark:text-white">스킬 관리</h1>
-                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">총 {skills.length}개 스킬</p>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                        총 {skills.length}개 스킬 (현재 페이지)
+                    </p>
                 </div>
-                <button onClick={() => { setEditing(null); setCreating(true); setForm(emptySkill); }}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-accent text-white text-sm font-medium hover:bg-blue-600 transition-colors shadow-sm">
-                    <Plus size={16} /> 새 스킬
-                </button>
+                {isAdmin && (
+                    <button onClick={() => { setEditing(null); setCreating(true); setForm(emptySkill); setCustomCategory(""); }}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-accent text-white text-sm font-medium hover:bg-blue-600 transition-colors shadow-sm">
+                        <Plus size={16} /> 새 스킬
+                    </button>
+                )}
+            </div>
+
+            {/* Search & Filter Bar */}
+            <div className="mt-4 flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="스킬 검색..."
+                        className={inputClass + " pl-9"}
+                    />
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                    <button
+                        onClick={() => setFilterCategory("ALL")}
+                        className={`px-3 py-2 rounded-lg text-xs font-bold transition-all ${filterCategory === "ALL"
+                            ? "bg-accent text-white shadow-sm"
+                            : "bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700"
+                            }`}
+                    >
+                        전체 ({skills.length})
+                    </button>
+                    {allCategories.map((cat) => {
+                        return (
+                            <button
+                                key={cat}
+                                onClick={() => { setFilterCategory(cat); setPage(1); }}
+                                className={`px-3 py-2 rounded-lg text-xs font-bold transition-all ${filterCategory === cat
+                                    ? "bg-accent text-white shadow-sm"
+                                    : "bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700"
+                                    }`}
+                            >
+                                {cat}
+                            </button>
+                        );
+                    })}
+                </div>
             </div>
 
             {(creating || editing) && (
@@ -141,9 +221,31 @@ export default function AdminSkillsPage() {
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">카테고리</label>
-                            <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className={inputClass}>
-                                {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+                            <select
+                                value={customCategory ? "__custom__" : form.category}
+                                onChange={(e) => {
+                                    if (e.target.value === "__custom__") {
+                                        setCustomCategory(" ");
+                                    } else {
+                                        setForm({ ...form, category: e.target.value });
+                                        setCustomCategory("");
+                                    }
+                                }}
+                                className={inputClass}
+                            >
+                                <option value="">카테고리 선택</option>
+                                {allCategories.map((c) => <option key={c} value={c}>{c}</option>)}
+                                <option value="__custom__">+ 새 카테고리</option>
                             </select>
+                            {customCategory !== "" && (
+                                <input
+                                    value={customCategory.trim()}
+                                    onChange={(e) => setCustomCategory(e.target.value)}
+                                    placeholder="새 카테고리 이름 입력"
+                                    className={inputClass + " mt-2"}
+                                    autoFocus
+                                />
+                            )}
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">아이콘 (이모지) *</label>
@@ -195,22 +297,49 @@ export default function AdminSkillsPage() {
                                         </div>
                                         <span className="text-xs font-mono font-bold text-slate-500 dark:text-slate-400 w-10 text-right">{skill.level}%</span>
                                     </div>
-                                    <div className="flex items-center gap-1 ml-4">
-                                        <button onClick={() => handleEdit(skill)} className="p-2 rounded-lg text-slate-400 hover:text-accent hover:bg-accent/10 transition-colors"><Pencil size={14} /></button>
-                                        <button onClick={() => handleDelete(skill.id)} className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"><Trash2 size={14} /></button>
-                                    </div>
+                                    {isAdmin && (
+                                        <div className="flex items-center gap-1 ml-4">
+                                            <button onClick={() => handleEdit(skill)} className="p-2 rounded-lg text-slate-400 hover:text-accent hover:bg-accent/10 transition-colors"><Pencil size={14} /></button>
+                                            <button onClick={() => handleDelete(skill.id)} className="p-2 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"><Trash2 size={14} /></button>
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>
                     </div>
                 ))}
-                {skills.length === 0 && (
+                {filteredSkills.length === 0 && (
                     <div className="text-center py-16 bg-white dark:bg-slate-900 border border-dashed border-slate-300 dark:border-slate-700 rounded-xl">
                         <Cpu size={40} className="mx-auto text-slate-300 dark:text-slate-600" />
-                        <p className="mt-3 text-sm text-slate-400">등록된 스킬이 없습니다.</p>
+                        <p className="mt-3 text-sm text-slate-400">
+                            {searchQuery || filterCategory !== "ALL" ? "검색 결과가 없습니다." : "등록된 스킬이 없습니다."}
+                        </p>
                     </div>
                 )}
             </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+                <div className="mt-8 flex justify-center gap-2 pb-8">
+                    <button
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        disabled={page === 1}
+                        className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-sm disabled:opacity-50 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    >
+                        이전
+                    </button>
+                    <span className="px-3 py-1.5 text-sm text-slate-600 dark:text-slate-400">
+                        {page} / {totalPages}
+                    </span>
+                    <button
+                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={page === totalPages}
+                        className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-sm disabled:opacity-50 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    >
+                        다음
+                    </button>
+                </div>
+            )}
         </div>
     );
 }

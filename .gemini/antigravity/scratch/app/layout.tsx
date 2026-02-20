@@ -6,6 +6,7 @@ import Footer from "@/components/layout/Footer";
 import ScrollProgress from "@/components/layout/ScrollProgress";
 import BackToTop from "@/components/layout/BackToTop";
 import PageTracker from "@/components/layout/PageTracker";
+import ConditionalLayout from "@/components/layout/ConditionalLayout";
 import "./globals.css";
 
 const inter = Inter({
@@ -33,11 +34,16 @@ export const metadata: Metadata = {
     },
 };
 
-export default function RootLayout({
+import { getSiteSettings } from "@/lib/settings";
+import MaintenanceGuard from "@/components/layout/MaintenanceGuard";
+
+export default async function RootLayout({
     children,
 }: Readonly<{
     children: React.ReactNode;
 }>) {
+    const settings = await getSiteSettings();
+
     return (
         <html
             lang="ko"
@@ -51,12 +57,20 @@ export default function RootLayout({
                     enableSystem
                     disableTransitionOnChange
                 >
-                    <ScrollProgress />
-                    <PageTracker />
-                    <Header />
-                    <main>{children}</main>
-                    <Footer />
-                    <BackToTop />
+                    <MaintenanceGuard maintenanceMode={settings.maintenanceMode}>
+                        <ConditionalLayout>
+                            <ScrollProgress />
+                        </ConditionalLayout>
+                        <PageTracker />
+                        <ConditionalLayout>
+                            <Header />
+                        </ConditionalLayout>
+                        <main>{children}</main>
+                        <ConditionalLayout>
+                            <Footer />
+                            <BackToTop />
+                        </ConditionalLayout>
+                    </MaintenanceGuard>
                 </ThemeProvider>
             </body>
         </html>

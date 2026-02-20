@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { requireAuth, requireAdmin, getCurrentUser } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
 import { rateLimit, rateLimitResponse, logSecurityEvent } from "@/lib/rateLimit";
+import { logger } from "@/lib/logger";
 
 export async function GET(request: Request) {
     const authError = await requireAuth();
@@ -57,6 +58,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
+    const metadata = body.metadata ? JSON.stringify(body.metadata) : null;
     const project = await prisma.project.create({
         data: {
             title: body.title,
@@ -66,11 +68,14 @@ export async function POST(request: Request) {
             github: body.github || null,
             image: body.image || null,
             order: body.order || 0,
+            metadata,
             metaTitle: body.metaTitle || null,
             metaDescription: body.metaDescription || null,
             metaKeywords: body.metaKeywords || null,
         },
     });
+
+
 
     const user = await getCurrentUser();
     if (user) {
@@ -80,5 +85,6 @@ export async function POST(request: Request) {
         });
     }
 
+    logger.info("Project created", { id: project.id, title: project.title, admin: user?.username });
     return NextResponse.json(project, { status: 201 });
 }

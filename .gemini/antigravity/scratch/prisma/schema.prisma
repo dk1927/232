@@ -68,7 +68,9 @@ model SiteSettings {
   footerTagline   String @default("Minimalist Tech Professional")
   githubUrl       String @default("https://github.com")
   linkedinUrl     String @default("https://linkedin.com")
-  email           String @default("hello@example.com")
+  email           String  @default("hello@example.com")
+  maintenanceMode Boolean @default(false)
+  maintenanceMessage String? @default("현재 시스템 점검 중입니다. 잠시 후 다시 시도해 주세요.")
 }
 
 model ContactMessage {

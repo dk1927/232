@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/components/admin/Toast";
+import { useAdminRole } from "@/components/admin/AdminContext";
 import { Trash2, Eye, ChevronDown, ChevronUp, Mail, Clock, Search, Filter, User } from "lucide-react";
 
 interface Message {
@@ -15,24 +16,41 @@ interface Message {
 
 export default function AdminMessagesPage() {
     const { toast } = useToast();
+    const { isAdmin } = useAdminRole();
     const [messages, setMessages] = useState<Message[]>([]);
     const [loading, setLoading] = useState(true);
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [filter, setFilter] = useState<"all" | "unread" | "read">("all");
+    const [page, setPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
     const [search, setSearch] = useState("");
+    const [debouncedSearch, setDebouncedSearch] = useState("");
+
+    // Debounce search input
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedSearch(search), 500);
+        return () => clearTimeout(timer);
+    }, [search]);
 
     const fetchMessages = useCallback(async () => {
         try {
-            const res = await fetch("/api/admin/messages");
+            const query = new URLSearchParams({
+                page: page.toString(),
+                limit: "10",
+                filter,
+                search: debouncedSearch,
+            });
+            const res = await fetch(`/api/admin/messages?${query}`);
             if (!res.ok) throw new Error();
-            const data = await res.json();
+            const { data, meta } = await res.json();
             setMessages(data);
+            setTotalPages(meta.totalPages);
         } catch {
             toast("메시지를 불러오는데 실패했습니다.", "error");
         } finally {
             setLoading(false);
         }
-    }, [toast]);
+    }, [toast, page, filter, debouncedSearch]);
 
     useEffect(() => { fetchMessages(); }, [fetchMessages]);
 
@@ -60,17 +78,8 @@ export default function AdminMessagesPage() {
         } catch { toast("삭제에 실패했습니다.", "error"); }
     };
 
-    const filteredMessages = messages
-        .filter((m) => {
-            if (filter === "unread") return !m.read;
-            if (filter === "read") return m.read;
-            return true;
-        })
-        .filter((m) => {
-            if (!search.trim()) return true;
-            const q = search.toLowerCase();
-            return m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q) || m.message.toLowerCase().includes(q);
-        });
+    // Use server-side data directly
+    const filteredMessages = messages;
 
     const unreadCount = messages.filter((m) => !m.read).length;
 
@@ -129,8 +138,8 @@ export default function AdminMessagesPage() {
                             key={f.key}
                             onClick={() => setFilter(f.key)}
                             className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${filter === f.key
-                                    ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
-                                    : "text-slate-500 dark:text-slate-400 hover:text-slate-700"
+                                ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
+                                : "text-slate-500 dark:text-slate-400 hover:text-slate-700"
                                 }`}
                         >
                             {f.label}
@@ -145,8 +154,8 @@ export default function AdminMessagesPage() {
                     <div
                         key={msg.id}
                         className={`bg-white dark:bg-slate-900 border rounded-xl transition-all ${!msg.read
-                                ? "border-accent/20 shadow-sm"
-                                : "border-slate-200 dark:border-slate-800"
+                            ? "border-accent/20 shadow-sm"
+                            : "border-slate-200 dark:border-slate-800"
                             }`}
                     >
                         <button
@@ -194,9 +203,11 @@ export default function AdminMessagesPage() {
                                             <Eye size={12} /> 읽음 처리
                                         </button>
                                     )}
-                                    <button onClick={() => deleteMessage(msg.id)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 dark:bg-red-950/30 text-red-500 text-xs font-medium hover:bg-red-100 dark:hover:bg-red-950/50 transition-colors">
-                                        <Trash2 size={12} /> 삭제
-                                    </button>
+                                    {isAdmin && (
+                                        <button onClick={() => deleteMessage(msg.id)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 dark:bg-red-950/30 text-red-500 text-xs font-medium hover:bg-red-100 dark:hover:bg-red-950/50 transition-colors">
+                                            <Trash2 size={12} /> 삭제
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -219,6 +230,29 @@ export default function AdminMessagesPage() {
                     </div>
                 )}
             </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+                <div className="mt-6 flex justify-center gap-2">
+                    <button
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                        disabled={page === 1}
+                        className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-sm disabled:opacity-50 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    >
+                        이전
+                    </button>
+                    <span className="px-3 py-1.5 text-sm text-slate-600 dark:text-slate-400">
+                        {page} / {totalPages}
+                    </span>
+                    <button
+                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={page === totalPages}
+                        className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 text-sm disabled:opacity-50 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    >
+                        다음
+                    </button>
+                </div>
+            )}
         </div>
     );
 }

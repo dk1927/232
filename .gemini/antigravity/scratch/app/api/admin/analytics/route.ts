@@ -48,17 +48,50 @@ export async function GET() {
         pathCounts[pv.path] = (pathCounts[pv.path] || 0) + 1;
     });
 
-    // Project category distribution
-    const projects = await prisma.project.findMany({ select: { tags: true } });
-    const categoryCounts: Record<string, number> = {};
-    projects.forEach((p: { tags: string }) => {
+    // 1. Sector Expertise (Radar Chart Data)
+    // Group by metadata.type and calculate average difficulty
+    const projects = await prisma.project.findMany();
+    const sectorStats: Record<string, { totalDifficulty: number; count: number }> = {};
+    const techStackCounts: Record<string, number> = {};
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    projects.forEach((p: any) => {
+        // Sector stats
+        let sector = "미분류";
+        let difficulty = 0;
+        if (p.metadata) {
+            try {
+                const meta = JSON.parse(p.metadata);
+                if (meta.type) sector = meta.type;
+                if (meta.difficulty) difficulty = Number(meta.difficulty);
+            } catch { /* skip */ }
+        }
+        if (!sectorStats[sector]) sectorStats[sector] = { totalDifficulty: 0, count: 0 };
+        sectorStats[sector].totalDifficulty += difficulty;
+        sectorStats[sector].count += 1;
+
+        // Tech stack counts
         try {
             const tags: string[] = JSON.parse(p.tags);
             tags.forEach((tag) => {
-                categoryCounts[tag] = (categoryCounts[tag] || 0) + 1;
+                const t = tag.trim();
+                if (t) techStackCounts[t] = (techStackCounts[t] || 0) + 1;
             });
-        } catch { /* skip invalid */ }
+        } catch { /* skip */ }
     });
+
+    // Format sector data for Radar chart
+    const sectorExpertise = Object.entries(sectorStats).map(([sector, stats]) => ({
+        sector,
+        avgDifficulty: parseFloat((stats.totalDifficulty / stats.count).toFixed(1)),
+        projectCount: stats.count,
+    }));
+
+    // Format tech stack for Bar chart (Top 10)
+    const topTechStack = Object.entries(techStackCounts)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 10)
+        .map(([tech, count]) => ({ tech, count }));
 
     // Summary stats
     const [totalMessages, unreadMessages, totalProjects, totalSkills] = await Promise.all([
@@ -72,7 +105,8 @@ export async function GET() {
         dailyVisitors: dailyCounts,
         referrers: referrerCounts,
         topPages: pathCounts,
-        projectCategories: categoryCounts,
+        sectorExpertise,
+        topTechStack,
         stats: {
             totalMessages,
             unreadMessages,
